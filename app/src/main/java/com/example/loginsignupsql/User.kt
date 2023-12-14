@@ -3,8 +3,10 @@ package com.example.loginsignupsql
 data class User(
     val id: String,
     val username: String,
-    val salt: ByteArray,
-    val password: ByteArray
+    val encryptedSaltCiphertext: ByteArray,
+    val encryptedSaltIV: ByteArray,
+    val encryptedHashedPasswordCiphertext: ByteArray,
+    val encryptedHashedPasswordIV: ByteArray
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -12,15 +14,19 @@ data class User(
 
         return id == other.id &&
                 username == other.username &&
-                salt.contentEquals(other.salt) &&
-                password.contentEquals(other.password)
+                encryptedSaltCiphertext.contentEquals(other.encryptedSaltCiphertext) &&
+                encryptedSaltIV.contentEquals(other.encryptedSaltIV) &&
+                encryptedHashedPasswordCiphertext.contentEquals(other.encryptedHashedPasswordCiphertext) &&
+                encryptedHashedPasswordIV.contentEquals(other.encryptedHashedPasswordIV)
     }
 
     override fun hashCode(): Int {
         var result = id.hashCode()
         result = 31 * result + username.hashCode()
-        result = 31 * result + salt.contentHashCode()
-        result = 31 * result + password.contentHashCode()
+        result = 31 * result + encryptedSaltCiphertext.contentHashCode()
+        result = 31 * result + encryptedSaltIV.contentHashCode()
+        result = 31 * result + encryptedHashedPasswordCiphertext.contentHashCode()
+        result = 31 * result + encryptedHashedPasswordIV.contentHashCode()
         return result
     }
 }

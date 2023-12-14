@@ -4,12 +4,13 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Toast
-import org.signal.argon2.Argon2
-import org.signal.argon2.MemoryCost
-import org.signal.argon2.Type
-import org.signal.argon2.Version
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.SecretKey
 
 import com.example.loginsignupsql.databinding.ActivityLoginBinding
+import com.example.loginsignupsql.utils.Crypto
+import javax.crypto.spec.IvParameterSpec
 
 class LoginActivity : AppCompatActivity() {
 
@@ -24,9 +25,9 @@ class LoginActivity : AppCompatActivity() {
         databaseHelper = DatabaseHelper(this)
 
         binding.loginButton.setOnClickListener {
-            val loginUsername = binding.loginUsername.text.toString()
-            val loginPassword = binding.loginPassword.text.toString()
-            loginDatabase(loginUsername, loginPassword)
+            val username = binding.loginUsername.text.toString()
+            val password = binding.loginPassword.text.toString().toByteArray()
+            loginDatabase(username, password)
         }
         binding.signupRedirect.setOnClickListener {
             val intent = Intent(this, SignupActivity::class.java)
@@ -35,26 +36,25 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun loginDatabase(username: String, password: String) {
+    private fun loginDatabase(username: String, password: ByteArray) {
         val user = databaseHelper.readUser(username)
 
         if (user != null) {
-            val storedSalt = user.salt
-            val storedHashedPassword = user.password
+            // Retrieve the encrypted salt and hashed password from the SQLite db
+            val storedEncryptedSaltCiphertext = user.encryptedSaltCiphertext
+            val storedEncryptedSaltIV = user.encryptedSaltIV
+            val storedEncryptedHashedPasswordCiphertext = user.encryptedHashedPasswordCiphertext
+            val storedEncryptedHashedPasswordIV = user.encryptedHashedPasswordIV
 
-            val argon2 = Argon2.Builder(Version.V13)
-                .type(Type.Argon2id)
-                .memoryCost(MemoryCost.MiB(32))
-                .parallelism(1)
-                .iterations(3)
-                .build()
+            // Decrypt using the keys from the Android KeyStore
+            val decryptedSalt = decryptDataWithKeyStoreKeys(storedEncryptedSaltCiphertext, storedEncryptedSaltIV, "saltKey")
+            val decryptedHashedPassword = decryptDataWithKeyStoreKeys(storedEncryptedHashedPasswordCiphertext, storedEncryptedHashedPasswordIV, "passwordKey")
 
-            // Hash the entered password with the stored salt
-            val result = argon2.hash(password.toByteArray(), storedSalt)
-            val hashedEnteredPassword = result.hash
+            // Hash the password using Argon 2id and the decrypted salt
+            val hashedPassword = Crypto.hashPassword(password, decryptedSalt)
 
-            // Compare the stored hashed password with the newly hashed entered password
-            if (hashedEnteredPassword.contentEquals(storedHashedPassword)) {
+            // Compare the (decrypted) stored hashed password with the hashed entered password
+            if (hashedPassword.contentEquals(decryptedHashedPassword)) {
                 Toast.makeText(this, "Login Successful", Toast.LENGTH_SHORT).show()
                 val intent = Intent(this, MainActivity::class.java)
                 startActivity(intent)
@@ -66,4 +66,23 @@ class LoginActivity : AppCompatActivity() {
             Toast.makeText(this, "Login Failed", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // Helper function to decrypt data in the Keystore
+    private fun decryptDataWithKeyStoreKeys(ciphertext: ByteArray, iv: ByteArray, alias: String): ByteArray {
+        try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+
+            val key = keyStore.getKey(alias, null) as SecretKey
+
+            val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
+            val ivParameterSpec = IvParameterSpec(iv)
+            cipher.init(Cipher.DECRYPT_MODE, key, ivParameterSpec)
+
+            return cipher.doFinal(ciphertext)
+        } catch (e: Exception) {
+            throw RuntimeException("Error decrypting data", e)
+        }
+    }
+
 }
