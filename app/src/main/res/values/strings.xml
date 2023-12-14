@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Login Signup SQL</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="signup">SIGNUP</string>
+    <string name="already_registered_login">Already registered? Login</string>
+    <string name="login">LOGIN</string>
+    <string name="not_yet_registered_signup">Not yet registered? Signup</string>
+    <string name="welcome_to_the_app">Welcome to the App!</string>
+</resources>
